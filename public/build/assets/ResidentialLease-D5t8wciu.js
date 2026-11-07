@@ -1,0 +1,1 @@
+import{j as t}from"./app-CXtulxqP.js";import e from"./ComingSoon-DnQq38vX.js";import"./recharts-DInUbPLx.js";import"./AppLayout-C_u5lSq8.js";import"./x-BDO4Pe99.js";import"./ComingSoon-Dxpkj0KR.js";import"./zap-V0I1PMx_.js";function p(){return t.jsx(e,{title:"Residential Lease Comparables",description:"Residential rental comparables and market insights"})}export{p as default};

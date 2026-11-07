@@ -1,0 +1,1 @@
+import{j as o}from"./app-CXtulxqP.js";import i from"./ComingSoon-DnQq38vX.js";import"./recharts-DInUbPLx.js";import"./AppLayout-C_u5lSq8.js";import"./x-BDO4Pe99.js";import"./ComingSoon-Dxpkj0KR.js";import"./zap-V0I1PMx_.js";function e(){return o.jsx(i,{title:"Location Rankings",description:"Location reports and rankings analysis"})}export{e as default};

@@ -1,0 +1,1 @@
+import{j as t}from"./app-CXtulxqP.js";import r from"./ComingSoon-DnQq38vX.js";import"./recharts-DInUbPLx.js";import"./AppLayout-C_u5lSq8.js";import"./x-BDO4Pe99.js";import"./ComingSoon-Dxpkj0KR.js";import"./zap-V0I1PMx_.js";function s(){return t.jsx(r,{title:"Tenant and Criteria",description:"Tenant portfolio, requirements and ratings"})}export{s as default};

@@ -1,0 +1,1 @@
+import{j as t}from"./app-CXtulxqP.js";import o from"./ComingSoon-DnQq38vX.js";import"./recharts-DInUbPLx.js";import"./AppLayout-C_u5lSq8.js";import"./x-BDO4Pe99.js";import"./ComingSoon-Dxpkj0KR.js";import"./zap-V0I1PMx_.js";function u(){return t.jsx(o,{title:"Scout Map",description:"Calculate proximity to location and analyze tenant distribution"})}export{u as default};

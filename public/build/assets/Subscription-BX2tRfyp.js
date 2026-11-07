@@ -1,0 +1,1 @@
+import{j as i}from"./app-CXtulxqP.js";import o from"./ComingSoon-DnQq38vX.js";import"./recharts-DInUbPLx.js";import"./AppLayout-C_u5lSq8.js";import"./x-BDO4Pe99.js";import"./ComingSoon-Dxpkj0KR.js";import"./zap-V0I1PMx_.js";function e(){return i.jsx(o,{title:"Subscription",description:"Manage your subscription plan and billing"})}export{e as default};
