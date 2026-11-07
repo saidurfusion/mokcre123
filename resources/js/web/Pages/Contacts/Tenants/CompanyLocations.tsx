@@ -1,0 +1,901 @@
+import { useState, useCallback, useEffect } from "react";
+import { Head, router, usePage } from "@inertiajs/react";
+import AppLayout from "../../../Layouts/AppLayout";
+import CompanyDetailsLayout from "../../../../Layouts/CompanyDetailsLayout";
+import { PaginatedData, TennentCompany, TennentLocation } from "../../../../types";
+import CompanyDetailsHeader from "../../../../Components/Tenant/CompanyDetailsHeader";
+import LocationsListView from "../../../../Components/Tenant/LocationsListView";
+import LocationsMapView from "../../../../Components/Tenant/LocationsMapView";
+import LocationsGalleryView from "../../../../Components/Tenant/LocationsGalleryView";
+import LocationsFilterBar from "../../../../Components/Tenant/LocationsFilterBar";
+import LocationsAdvancedFiltersPanel from "../../../../Components/Tenant/LocationsAdvancedFiltersPanel";
+import { ResizableColumn } from "@/Components/ResizableTable/ResizableTable";
+import { Minus, Globe } from "lucide-react";
+
+interface PageProps {
+    company: TennentCompany;
+    locations: PaginatedData<TennentLocation>;
+    filters: {
+        search?: string;
+        address_search?: string;
+        min_sf_occupied?: number;
+        max_sf_occupied?: number;
+        space_use?: string;
+        occupancy?: string;
+        industry?: string;
+        city?: string;
+        state?: string;
+        market?: string;
+        property_type?: string;
+    };
+    sort: {
+        by: string;
+        dir: string;
+    };
+    currentIndex?: number;
+    totalCount?: number;
+    previousCompanyId?: number | null;
+    nextCompanyId?: number | null;
+}
+
+export default function CompanyLocations({
+    company,
+    locations,
+    filters,
+    sort,
+    currentIndex,
+    totalCount,
+    previousCompanyId,
+    nextCompanyId,
+}: PageProps) {
+    const { url } = usePage();
+    
+    // Get view mode from URL or default to "list"
+    const getViewModeFromUrl = (): "map" | "list" | "gallery" => {
+        if (typeof window !== "undefined") {
+            const params = new URLSearchParams(window.location.search);
+            const mode = params.get("view_mode");
+            if (mode === "map" || mode === "list" || mode === "gallery") {
+                return mode;
+            }
+        }
+        return "list";
+    };
+
+    const [viewMode, setViewMode] = useState<"map" | "list" | "gallery">(
+        getViewModeFromUrl()
+    );
+    const [selectedLocationId, setSelectedLocationId] = useState<number | null>(
+        null
+    );
+    const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+
+    // Update view mode from URL on mount and when URL changes
+    useEffect(() => {
+        const mode = getViewModeFromUrl();
+        setViewMode((currentMode) => {
+            return mode !== currentMode ? mode : currentMode;
+        });
+    }, [url]);
+
+    // Helper to preserve view mode in navigation
+    const preserveViewMode = useCallback(
+        (params: Record<string, any> = {}) => {
+            return {
+                ...params,
+                view_mode: viewMode,
+            };
+        },
+        [viewMode]
+    );
+
+    // Helper to add view_mode to URL string
+    const addViewModeToUrl = useCallback(
+        (urlString: string | null): string | null => {
+            if (!urlString) return null;
+            try {
+                const url = new URL(urlString, window.location.origin);
+                url.searchParams.set("view_mode", viewMode);
+                return url.pathname + url.search;
+            } catch {
+                return urlString;
+            }
+        },
+        [viewMode]
+    );
+
+    const updateFilters = useCallback(
+        (newFilters: Record<string, any>) => {
+            router.get(
+                `/contacts/tenants/${company.id}/locations`,
+                preserveViewMode({
+                    ...filters,
+                    ...newFilters,
+                    page: 1,
+                }),
+                {
+                    preserveState: true,
+                    preserveScroll: false,
+                }
+            );
+        },
+        [filters, company.id, preserveViewMode]
+    );
+
+    const handleAddressSearchChange = useCallback(
+        (value: string) => {
+            updateFilters({ address_search: value || undefined });
+        },
+        [updateFilters]
+    );
+
+    const handleTenantSearchChange = useCallback(
+        (value: string) => {
+            updateFilters({ search: value || undefined });
+        },
+        [updateFilters]
+    );
+
+    const handleSpaceUseChange = useCallback(
+        (value: string | null) => {
+            updateFilters({ space_use: value || undefined });
+        },
+        [updateFilters]
+    );
+
+    const handleSfOccupiedChange = useCallback(
+        (min: number | null, max: number | null) => {
+            updateFilters({
+                min_sf_occupied: min || undefined,
+                max_sf_occupied: max || undefined,
+            });
+        },
+        [updateFilters]
+    );
+
+    const handleOccupancyChange = useCallback(
+        (value: string | null) => {
+            updateFilters({ occupancy: value || undefined });
+        },
+        [updateFilters]
+    );
+
+    const handleClearFilters = useCallback(() => {
+        router.get(`/contacts/tenants/${company.id}/locations`, {
+            view_mode: viewMode,
+        });
+        setShowAdvancedFilters(false);
+    }, [company.id, viewMode]);
+
+    const activeFiltersCount = Object.values(filters).filter(
+        (v) => v !== undefined && v !== ""
+    ).length;
+
+    // Formatting functions
+    const formatNumber = (
+        value: string | number | null | undefined
+    ): string => {
+        if (value === null || value === undefined) return "—";
+        const num = typeof value === "string" ? parseFloat(value) : value;
+        if (isNaN(num)) return "—";
+        return num.toLocaleString();
+    };
+
+    const formatSF = (value: string | number | null | undefined): string => {
+        if (value === null || value === undefined) return "—";
+        const num = typeof value === "string" ? parseFloat(value) : value;
+        if (isNaN(num)) return "—";
+        return `${num.toLocaleString()} SF`;
+    };
+
+    const formatDate = (date: string | null | undefined): string => {
+        if (!date) return "—";
+        try {
+            return new Date(date).toLocaleDateString("en-US", {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+            });
+        } catch {
+            return "—";
+        }
+    };
+
+    const formatCurrency = (
+        value: string | number | null | undefined
+    ): string => {
+        if (value === null || value === undefined) return "—";
+        const num = typeof value === "string" ? parseFloat(value) : value;
+        if (isNaN(num)) return "—";
+        return `$${num.toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        })}`;
+    };
+
+    const formatPercent = (
+        value: string | number | null | undefined
+    ): string => {
+        if (value === null || value === undefined) return "—";
+        const num = typeof value === "string" ? parseFloat(value) : value;
+        if (isNaN(num)) return "—";
+        return `${num.toFixed(2)}%`;
+    };
+
+    const formatPhone = (phone: string | null | undefined): string => {
+        if (!phone) return "—";
+        return phone;
+    };
+
+    const formatUrl = (url: string | null | undefined): string => {
+        if (!url) return "—";
+        if (!url.startsWith("http")) {
+            return `https://${url}`;
+        }
+        return url;
+    };
+
+    const tabs = [
+        {
+            id: "summary",
+            label: "Summary",
+            href: `/contacts/tenants/${company.id}`,
+        },
+        {
+            id: "locations",
+            label: "Locations",
+            href: `/contacts/tenants/${company.id}/locations`,
+        },
+        {
+            id: "transactions",
+            label: "Transactions",
+            href: `/contacts/tenants/${company.id}/transactions`,
+        },
+        {
+            id: "lease_expirations",
+            label: "Lease Expirations",
+            href: `/contacts/tenants/${company.id}/lease-expirations`,
+        },
+        {
+            id: "contacts",
+            label: "Contacts",
+            href: `/contacts/tenants/${company.id}/contacts`,
+        },
+        {
+            id: "relationships",
+            label: "Relationships",
+            href: `/contacts/tenants/${company.id}/relationships`,
+        },
+        {
+            id: "news",
+            label: "News",
+            href: `/contacts/tenants/${company.id}/news`,
+        },
+    ];
+
+    const columns: ResizableColumn[] = [
+        {
+            key: "address",
+            label: "Address",
+            align: "left",
+            defaultWidth: 200,
+        },
+        {
+            key: "city",
+            label: "City",
+            align: "left",
+            defaultWidth: 120,
+        },
+        {
+            key: "state",
+            label: "State",
+            align: "left",
+            defaultWidth: 100,
+        },
+        {
+            key: "country",
+            label: "Country",
+            align: "left",
+            defaultWidth: 100,
+        },
+        {
+            key: "tenant_name",
+            label: "Tenant Name",
+            align: "left",
+            defaultWidth: 180,
+        },
+        {
+            key: "sf_occupied",
+            label: "SF Occupied",
+            align: "right",
+            defaultWidth: 120,
+            render: (row) => formatSF(row.sf_occupied),
+        },
+        {
+            key: "floor",
+            label: "Floor",
+            align: "left",
+            defaultWidth: 100,
+        },
+        {
+            key: "space_use",
+            label: "Space Use",
+            align: "left",
+            defaultWidth: 120,
+        },
+        {
+            key: "moved_in",
+            label: "Moved In",
+            align: "left",
+            defaultWidth: 120,
+            render: (row) => formatDate(row.moved_in),
+        },
+        {
+            key: "commencement",
+            label: "Commencement",
+            align: "left",
+            defaultWidth: 130,
+            render: (row) => formatDate(row.commencement),
+        },
+        {
+            key: "expiration",
+            label: "Expiration",
+            align: "left",
+            defaultWidth: 120,
+            render: (row) => formatDate(row.expiration),
+        },
+        {
+            key: "percent_of_building",
+            label: "% of Building",
+            align: "left",
+            defaultWidth: 120,
+            render: (row) => formatPercent(row.percent_of_building),
+        },
+        {
+            key: "occupancy_type",
+            label: "Occupancy Type",
+            align: "left",
+            defaultWidth: 140,
+        },
+        {
+            key: "rent_per_sf_year",
+            label: "Rent/SF/year",
+            align: "right",
+            defaultWidth: 130,
+            render: (row) => formatCurrency(row.rent_per_sf_year),
+        },
+        {
+            key: "rent_type",
+            label: "Rent Type",
+            align: "left",
+            defaultWidth: 120,
+        },
+        {
+            key: "employees",
+            label: "Employees",
+            align: "right",
+            defaultWidth: 120,
+            render: (row) => formatNumber(row.employees),
+        },
+        {
+            key: "sf_per_employee",
+            label: "SF/Employee",
+            align: "right",
+            defaultWidth: 130,
+            render: (row) => formatSF(row.sf_per_employee),
+        },
+        {
+            key: "industry",
+            label: "Industry",
+            align: "left",
+            defaultWidth: 150,
+        },
+        {
+            key: "star_rating",
+            label: "Star Rating",
+            align: "right",
+            defaultWidth: 120,
+        },
+        {
+            key: "green_rating",
+            label: "Green Rating",
+            align: "left",
+            defaultWidth: 120,
+        },
+        {
+            key: "building_name",
+            label: "Building Name",
+            align: "left",
+            defaultWidth: 180,
+        },
+        {
+            key: "building_park",
+            label: "Building Park",
+            align: "left",
+            defaultWidth: 150,
+        },
+        {
+            key: "center_name",
+            label: "Center Name",
+            align: "left",
+            defaultWidth: 150,
+        },
+        {
+            key: "property_type",
+            label: "Property Type",
+            align: "left",
+            defaultWidth: 140,
+        },
+        {
+            key: "secondary_type",
+            label: "Secondary Type",
+            align: "left",
+            defaultWidth: 140,
+        },
+        {
+            key: "center_type",
+            label: "Center Type",
+            align: "left",
+            defaultWidth: 130,
+        },
+        {
+            key: "market",
+            label: "Market",
+            align: "left",
+            defaultWidth: 120,
+        },
+        {
+            key: "submarket",
+            label: "Submarket",
+            align: "left",
+            defaultWidth: 130,
+        },
+        {
+            key: "location_type",
+            label: "Location Type",
+            align: "left",
+            defaultWidth: 140,
+        },
+        {
+            key: "landlord",
+            label: "Landlord",
+            align: "left",
+            defaultWidth: 150,
+        },
+        {
+            key: "landlord_representative",
+            label: "Landlord Rep",
+            align: "left",
+            defaultWidth: 150,
+        },
+        {
+            key: "tenant_representative",
+            label: "Tenant Rep",
+            align: "left",
+            defaultWidth: 150,
+        },
+        {
+            key: "best_tenant_contact",
+            label: "Best Tenant Contact",
+            align: "left",
+            defaultWidth: 180,
+        },
+        {
+            key: "best_tenant_phone",
+            label: "Best Tenant Phone",
+            align: "left",
+            defaultWidth: 150,
+            render: (row) => formatPhone(row.best_tenant_phone),
+        },
+        {
+            key: "location_phone",
+            label: "Location Phone",
+            align: "left",
+            defaultWidth: 150,
+            render: (row) => formatPhone(row.location_phone),
+        },
+        {
+            key: "website",
+            label: "Website",
+            align: "left",
+            defaultWidth: 100,
+            render: (row) =>
+                row.website ? (
+                    <a
+                        href={formatUrl(row.website)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-800 underline"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <Globe className="h-4 w-4" />
+                    </a>
+                ) : (
+                    "—"
+                ),
+        },
+        {
+            key: "future_move",
+            label: "Future Move",
+            align: "left",
+            defaultWidth: 130,
+            render: (row) => formatDate(row.future_move),
+        },
+        {
+            key: "future_move_type",
+            label: "Future Move Type",
+            align: "left",
+            defaultWidth: 150,
+        },
+        {
+            key: "signed",
+            label: "Signed",
+            align: "left",
+            defaultWidth: 120,
+            render: (row) => formatDate(row.signed),
+        },
+        {
+            key: "suite",
+            label: "Suite",
+            align: "left",
+            defaultWidth: 100,
+        },
+        {
+            key: "zip",
+            label: "Zip",
+            align: "left",
+            defaultWidth: 100,
+        },
+        {
+            key: "time_in_building",
+            label: "Time in Building",
+            align: "left",
+            defaultWidth: 150,
+        },
+        {
+            key: "store_type",
+            label: "Store Type",
+            align: "left",
+            defaultWidth: 120,
+        },
+        {
+            key: "naics",
+            label: "NAICS",
+            align: "left",
+            defaultWidth: 100,
+        },
+        {
+            key: "sic",
+            label: "SIC",
+            align: "left",
+            defaultWidth: 100,
+        },
+        {
+            key: "property_id",
+            label: "Property ID",
+            align: "left",
+            defaultWidth: 120,
+        },
+    ];
+
+    return (
+        <AppLayout>
+            <Head title={`${company.tenant_name} - Locations`} />
+            <CompanyDetailsLayout
+                title={`${company.tenant_name} - Locations`}
+                tabs={tabs}
+                currentIndex={currentIndex}
+                totalCount={totalCount}
+                previousCompanyId={previousCompanyId}
+                nextCompanyId={nextCompanyId}
+                basePath="/contacts/tenants"
+                headerComponent={<CompanyDetailsHeader company={company} />}
+            >
+                {/* Search and Filter Bar */}
+                <LocationsFilterBar
+                    addressSearch={filters.address_search}
+                    tenantSearch={filters.search}
+                    onAddressSearchChange={handleAddressSearchChange}
+                    onTenantSearchChange={handleTenantSearchChange}
+                    spaceUse={filters.space_use || ""}
+                    onSpaceUseChange={handleSpaceUseChange}
+                    minSfOccupied={filters.min_sf_occupied || 0}
+                    maxSfOccupied={filters.max_sf_occupied || 0}
+                    onSfOccupiedChange={handleSfOccupiedChange}
+                    occupancy={filters.occupancy || ""}
+                    onOccupancyChange={handleOccupancyChange}
+                    onFiltersClick={() => {
+                        setShowAdvancedFilters((prev) => !prev);
+                    }}
+                    onClearClick={handleClearFilters}
+                    onSortClick={() => {
+                        // Handle sort click
+                    }}
+                    onSaveClick={() => {
+                        // Handle save click
+                    }}
+                    onReportsClick={() => {
+                        // Handle reports click
+                    }}
+                    onMoreClick={() => {
+                        // Handle more click
+                    }}
+                    viewMode={viewMode}
+                    onViewModeChange={(mode) => {
+                        // Update state immediately for instant UI feedback
+                        setViewMode(mode);
+                        // Update URL with view mode
+                        router.get(
+                            `/contacts/tenants/${company.id}/locations`,
+                            {
+                                ...filters,
+                                view_mode: mode,
+                            },
+                            {
+                                preserveState: true,
+                                preserveScroll: true,
+                                only: ["locations", "filters"],
+                            }
+                        );
+                    }}
+                    activeFiltersCount={activeFiltersCount}
+                />
+
+                {/* Content based on view mode */}
+                {viewMode === "map" && (
+                    <div className="h-[calc(100vh-200px)]">
+                        <LocationsMapView
+                            locations={locations.data}
+                            selectedLocationId={selectedLocationId}
+                            onLocationClick={(location) => {
+                                setSelectedLocationId(location.id);
+                            }}
+                            showAdvancedFilters={showAdvancedFilters}
+                            onCloseFilters={() => setShowAdvancedFilters(false)}
+                            onClearFilters={() => {
+                                router.get(`/contacts/tenants/${company.id}/locations`, {
+                                    view_mode: viewMode,
+                                });
+                                setShowAdvancedFilters(false);
+                            }}
+                            activeFiltersCount={activeFiltersCount}
+                        />
+                    </div>
+                )}
+
+                {viewMode === "list" && (
+                    <div className="bg-white">
+                        <LocationsListView
+                        columns={columns}
+                        data={locations.data}
+                        pagination={locations}
+                        showAdvancedFilters={showAdvancedFilters}
+                        onCloseFilters={() => setShowAdvancedFilters(false)}
+                        onClearFilters={handleClearFilters}
+                        onDoneFilters={() => {
+                            setShowAdvancedFilters(false);
+                        }}
+                        activeFiltersCount={activeFiltersCount}
+                        viewMode={viewMode}
+                        storageKey={`company-${company.id}-locations-column-widths`}
+                        renderCheckbox={() => (
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    onClick={(e) => e.stopPropagation()}
+                                />
+                            </div>
+                        )}
+                        renderActions={(row) => (
+                            <button
+                                className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-red-600"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    console.log("Remove", row.id);
+                                }}
+                                title="Remove"
+                            >
+                                <Minus className="h-4 w-4" />
+                            </button>
+                        )}
+                        filters={filters}
+                    />
+                    </div>
+                )}
+
+                {viewMode === "gallery" && (
+                    <div className="relative flex">
+                        {/* Main Content */}
+                        <div
+                            className={`transition-all duration-300 ${
+                                showAdvancedFilters
+                                    ? "w-[calc(100%-600px)]"
+                                    : "w-full"
+                            }`}
+                        >
+                            <div className="mx-auto max-w-[1920px]">
+                                <LocationsGalleryView
+                                    locations={locations.data}
+                                    onLocationClick={(location) => {
+                                        setSelectedLocationId(location.id);
+                                    }}
+                                />
+                                {/* Pagination for Gallery */}
+                                <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6">
+                                    <div className="flex flex-1 justify-between sm:hidden">
+                                        <button
+                                            onClick={() => {
+                                                const url = addViewModeToUrl(
+                                                    locations.prev_page_url
+                                                );
+                                                if (url) {
+                                                    router.get(url);
+                                                }
+                                            }}
+                                            disabled={!locations.prev_page_url}
+                                            className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                                        >
+                                            Previous
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                const url = addViewModeToUrl(
+                                                    locations.next_page_url
+                                                );
+                                                if (url) {
+                                                    router.get(url);
+                                                }
+                                            }}
+                                            disabled={!locations.next_page_url}
+                                            className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                                        >
+                                            Next
+                                        </button>
+                                    </div>
+                                    <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                                        <div>
+                                            <p className="text-sm text-gray-700">
+                                                Showing{" "}
+                                                <span className="font-medium">
+                                                    {locations.from}
+                                                </span>{" "}
+                                                to{" "}
+                                                <span className="font-medium">
+                                                    {locations.to}
+                                                </span>{" "}
+                                                of{" "}
+                                                <span className="font-medium">
+                                                    {locations.total}
+                                                </span>{" "}
+                                                results
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <select
+                                                value={locations.per_page}
+                                                onChange={(e) => {
+                                                    router.get(
+                                                        `/contacts/tenants/${company.id}/locations`,
+                                                        preserveViewMode({
+                                                            ...filters,
+                                                            per_page: e.target.value,
+                                                            page: 1,
+                                                        })
+                                                    );
+                                                }}
+                                                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                            >
+                                                <option value={10}>
+                                                    Show 10 per page
+                                                </option>
+                                                <option value={20}>
+                                                    Show 20 per page
+                                                </option>
+                                                <option value={50}>
+                                                    Show 50 per page
+                                                </option>
+                                                <option value={100}>
+                                                    Show 100 per page
+                                                </option>
+                                            </select>
+                                            <nav
+                                                className="flex items-center gap-1"
+                                                aria-label="Pagination"
+                                            >
+                                                <button
+                                                    onClick={() => {
+                                                        const url = addViewModeToUrl(
+                                                            locations.prev_page_url
+                                                        );
+                                                        if (url) {
+                                                            router.get(url);
+                                                        }
+                                                    }}
+                                                    disabled={!locations.prev_page_url}
+                                                    className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-2 py-2 text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                                                >
+                                                    ‹
+                                                </button>
+                                                {locations.links
+                                                    .slice(1, -1)
+                                                    .map((link, index) => {
+                                                        if (link.url === null) {
+                                                            return (
+                                                                <span
+                                                                    key={index}
+                                                                    className="relative inline-flex items-center border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700"
+                                                                >
+                                                                    {link.label}
+                                                                </span>
+                                                            );
+                                                        }
+                                                        return (
+                                                            <button
+                                                                key={index}
+                                                                onClick={() => {
+                                                                    const url =
+                                                                        addViewModeToUrl(
+                                                                            link.url
+                                                                        );
+                                                                    if (url) {
+                                                                        router.get(url);
+                                                                    }
+                                                                }}
+                                                                className={`relative inline-flex items-center border px-4 py-2 text-sm font-medium ${
+                                                                    link.active
+                                                                        ? "z-10 border-blue-500 bg-blue-50 text-blue-600"
+                                                                        : "border-gray-300 bg-white text-gray-500 hover:bg-gray-50"
+                                                                }`}
+                                                            >
+                                                                {link.label}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                <button
+                                                    onClick={() => {
+                                                        const url = addViewModeToUrl(
+                                                            locations.next_page_url
+                                                        );
+                                                        if (url) {
+                                                            router.get(url);
+                                                        }
+                                                    }}
+                                                    disabled={!locations.next_page_url}
+                                                    className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-2 py-2 text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                                                >
+                                                    ›
+                                                </button>
+                                            </nav>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Advanced Filters Sidebar */}
+                        {showAdvancedFilters && (
+                            <div className="w-[600px] border-l border-gray-200 bg-white shrink-0 flex flex-col">
+                                <LocationsAdvancedFiltersPanel
+                                    isOpen={showAdvancedFilters}
+                                    onClose={() => setShowAdvancedFilters(false)}
+                                    onClear={() => {
+                                        router.get(`/contacts/tenants/${company.id}/locations`, {
+                                            view_mode: viewMode,
+                                        });
+                                        setShowAdvancedFilters(false);
+                                    }}
+                                    onDone={() => {
+                                        setShowAdvancedFilters(false);
+                                    }}
+                                    activeFiltersCount={activeFiltersCount}
+                                />
+                            </div>
+                        )}
+                    </div>
+                )}
+            </CompanyDetailsLayout>
+        </AppLayout>
+    );
+}
+
